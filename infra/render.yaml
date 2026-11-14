@@ -1,0 +1,30 @@
+# Render Blueprint: one web service (Docker) + one Postgres database, HTTPS out of the box.
+# In Render: New → Blueprint → pick this repo → set "Blueprint Path" to infra/render.yaml.
+services:
+  - type: web
+    name: bazhanka
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./infra/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bazhanka-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAILS
+        sync: false   # you are asked for it on first deploy, e.g. inna@ucu.edu.ua,bohdana@ucu.edu.ua
+      - key: DONATION_URL
+        sync: false   # optional: a Monobank jar or volunteer fundraiser link shown in the footer
+      - key: DONATION_LABEL
+        value: Support a volunteer cause
+
+databases:
+  - name: bazhanka-db
+    plan: free
+    region: frankfurt
+    databaseName: bazhanka

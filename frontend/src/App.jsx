@@ -1,0 +1,63 @@
+import { Routes, Route, Link, NavLink, Navigate, useLocation } from 'react-router-dom';
+import { useSession } from './session.jsx';
+import Home from './pages/Home.jsx';
+import Auth from './pages/Auth.jsx';
+import Dashboard from './pages/Dashboard.jsx';
+import ListPage from './pages/ListPage.jsx';
+import Santa from './pages/Santa.jsx';
+import Admin from './pages/Admin.jsx';
+import Feedback from './Feedback.jsx';
+
+function RequireUser({ children }) {
+  const { user } = useSession();
+  const loc = useLocation();
+  if (user === undefined) return <div className="page muted">Loading…</div>;
+  if (!user) return <Navigate to={`/signin?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
+  return children;
+}
+
+export default function App() {
+  const { user, logout, config } = useSession();
+  return (
+    <div className="shell">
+      <header className="topbar">
+        <Link to={user ? '/dashboard' : '/'} className="brand">🎁 Bazhanka</Link>
+        <nav>
+          {user ? (
+            <>
+              <NavLink to="/dashboard">My lists</NavLink>
+              <NavLink to="/santa">Secret Santa</NavLink>
+              {user.isAdmin && <NavLink to="/admin">Stats</NavLink>}
+              <button className="link" onClick={logout}>Sign out</button>
+            </>
+          ) : user === null ? (
+            <>
+              <NavLink to="/signin">Sign in</NavLink>
+              <Link to="/signup" className="btn small">Sign up</Link>
+            </>
+          ) : null}
+        </nav>
+      </header>
+      <main>
+        <Routes>
+          <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Home />} />
+          <Route path="/signin" element={<Auth mode="signin" />} />
+          <Route path="/signup" element={<Auth mode="signup" />} />
+          <Route path="/dashboard" element={<RequireUser><Dashboard /></RequireUser>} />
+          <Route path="/l/:slug" element={<ListPage />} />
+          <Route path="/santa" element={<RequireUser><Santa /></RequireUser>} />
+          <Route path="/santa/:code" element={<RequireUser><Santa /></RequireUser>} />
+          <Route path="/admin" element={<RequireUser><Admin /></RequireUser>} />
+          <Route path="*" element={<div className="page"><h1>Page not found</h1><Link to="/">Go home</Link></div>} />
+        </Routes>
+      </main>
+      <footer className="footer">
+        <span>Bazhanka · a student prototype from UCU</span>
+        {config.donationUrl && (
+          <a href={config.donationUrl} target="_blank" rel="noreferrer">💛 {config.donationLabel}</a>
+        )}
+      </footer>
+      <Feedback />
+    </div>
+  );
+}

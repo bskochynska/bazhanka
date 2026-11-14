@@ -1,0 +1,31 @@
+# Local run of the whole stack:  docker compose -f infra/docker-compose.yml up --build
+# Then open http://localhost:3000
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bazhanka
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      retries: 20
+
+  app:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/bazhanka
+      JWT_SECRET: local-dev-secret
+      ADMIN_EMAILS: admin@example.com
+      # Cookies are marked Secure in production; allow plain http on localhost.
+      NODE_ENV: development
+    ports: ["3000:3000"]
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  pgdata:

@@ -3,10 +3,10 @@ import { useSession } from '../session.jsx';
 import { GiftIcon, LinkIcon, LockIcon, UsersIcon, ShuffleIcon, HeartIcon, MailIcon } from '../icons.jsx';
 
 const OCCASIONS = [
-  { title: 'Birthday', meta: 'Share one link with everyone', tone: 't1' },
-  { title: 'Christmas', meta: 'No duplicate presents', tone: 't2' },
-  { title: 'St Nicholas', meta: 'Small surprises, big joy', tone: 't3' },
-  { title: 'Graduation', meta: 'Chip in on the big one', tone: 't4' },
+  { title: 'Birthday', meta: 'Share one link with everyone', img: '/images/birthday.jpg', alt: 'Child about to blow out the candles on a birthday cake', pos: 'center 20%' },
+  { title: 'Christmas', meta: 'No duplicate presents', img: '/images/christmas.jpg', alt: 'Retro Christmas illustration with Santa’s sleigh over a snowy village', pos: 'center 30%' },
+  { title: 'St Nicholas', meta: 'Small surprises, big joy', img: '/images/st-nicholas.jpg', alt: 'Painting of Santa at a snowy chimney with wrapped gifts', pos: 'center 40%' },
+  { title: 'Graduation', meta: 'Chip in on the big one', img: '/images/graduation.jpg', alt: 'Black-and-white graduation portrait with colourful hand-lettering', pos: 'center 30%' },
 ];
 
 export default function Home() {
@@ -77,7 +77,8 @@ export default function Home() {
         <p className="section-sub">Pick a moment, start a list in a minute</p>
         <div className="occasion-row">
           {OCCASIONS.map((o) => (
-            <Link key={o.title} to={start} className={`occasion ${o.tone}`}>
+            <Link key={o.title} to={start} className="occasion">
+              <img className="occasion-img" src={o.img} alt={o.alt} loading="lazy" style={{ objectPosition: o.pos }} />
               <span className="occasion-name">{o.title}</span>
               <span className="occasion-meta">{o.meta}</span>
             </Link>

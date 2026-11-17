@@ -53,12 +53,11 @@ export default function App() {
           <Route path="*" element={<div className="page"><h1>Page not found</h1><Link to="/">Go home</Link></div>} />
         </Routes>
       </main>
-      <footer className="footer">
-        <span>Bazhanka · a student prototype from UCU</span>
-        {config.donationUrl && (
+      {config.donationUrl && (
+        <footer className="footer">
           <a href={config.donationUrl} target="_blank" rel="noreferrer">{config.donationLabel}</a>
-        )}
-      </footer>
+        </footer>
+      )}
       <Feedback />
     </div>
   );

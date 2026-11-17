@@ -19,6 +19,7 @@ function RequireUser({ children }) {
 
 export default function App() {
   const { user, logout, config } = useSession();
+  const { pathname } = useLocation();
   return (
     <div className="shell">
       <header className="topbar">
@@ -40,7 +41,7 @@ export default function App() {
           ) : null}
         </nav>
       </header>
-      <main>
+      <main className={pathname === '/' ? '' : 'app-bg'}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/signin" element={<Auth mode="signin" />} />

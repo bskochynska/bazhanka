@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, niceDate } from '../api.js';
+import { LinkIcon } from '../icons.jsx';
 
 function useMyLists() {
   const [lists, setLists] = useState([]);
@@ -148,7 +149,7 @@ function Group({ code }) {
         <>
           {!g.group.drawn && (
             <div className="card share">
-              <div><strong>Invite people</strong><p className="muted small">Send this link to your group chat. Everyone needs to join before the draw.</p></div>
+              <div><h3 className="share-title"><LinkIcon size={20} /> Invite people</h3><p className="muted small">Send this link to your group chat. Everyone needs to join before the draw.</p></div>
               <div className="share-row">
                 <input readOnly value={invite} onFocus={(e) => e.target.select()} />
                 <button className="btn" onClick={async () => { try { await navigator.clipboard.writeText(invite); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* ignore */ } }}>{copied ? 'Copied' : 'Copy'}</button>

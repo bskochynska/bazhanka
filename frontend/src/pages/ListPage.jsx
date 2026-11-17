@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, money, niceDate } from '../api.js';
 import { useSession } from '../session.jsx';
-import { GiftIcon, LockIcon, AsteriskIcon } from '../icons.jsx';
+import { GiftIcon, LockIcon, AsteriskIcon, LinkIcon } from '../icons.jsx';
 
 const emptyItem = { url: '', title: '', imageUrl: '', price: '', currency: 'UAH', note: '', chipIn: false };
 
@@ -97,7 +97,7 @@ function OwnerView({ data, reload }) {
       <Header w={w} />
       <div className="card share">
         <div>
-          <strong>Share this link with friends</strong>
+          <h3 className="share-title"><LinkIcon size={20} /> Share this link with friends</h3>
           <p className="muted small">Guests see which gifts are taken. You won’t — so the surprise stays a surprise.</p>
         </div>
         <div className="share-row">

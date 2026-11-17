@@ -23,7 +23,7 @@ export default function Feedback() {
   };
 
   if (!open) {
-    return <button className="feedback-fab" onClick={() => { setOpen(true); setState('idle'); }}>💬 Feedback</button>;
+    return <button className="feedback-fab" onClick={() => { setOpen(true); setState('idle'); }}>Feedback</button>;
   }
   return (
     <div className="feedback-panel card">
@@ -32,7 +32,7 @@ export default function Feedback() {
         <button className="link" onClick={() => setOpen(false)} aria-label="Close">✕</button>
       </div>
       {state === 'sent' ? (
-        <p>Thank you! We read every message. 💛</p>
+        <p>Thank you! We read every message.</p>
       ) : (
         <form onSubmit={send} className="stack">
           <div className="stars">

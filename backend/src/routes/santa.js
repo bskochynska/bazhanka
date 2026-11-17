@@ -27,7 +27,7 @@ r.get('/', ah(async (req, res) => {
     [req.user.id],
   );
   res.json({
-    groups: rows.map((g) => ({ name: g.name, code: g.code, members: Number(g.members), drawn: !!g.drawn_at, exchangeDate: g.exchange_date })),
+    groups: rows.map((g) => ({ name: g.name, code: g.code, members: Number(g.members), drawn: !!g.drawn_at, exchangeDate: g.exchange_date ? String(g.exchange_date).slice(0, 10) : null })),
   });
 }));
 
@@ -70,7 +70,7 @@ r.get('/:code', ah(async (req, res) => {
       name: g.name,
       code: g.code,
       budget: g.budget,
-      exchangeDate: g.exchange_date ? g.exchange_date.toISOString().slice(0, 10) : null,
+      exchangeDate: g.exchange_date ? String(g.exchange_date).slice(0, 10) : null,
       drawn: !!g.drawn_at,
     },
     isOwner: g.owner_id === req.user.id,

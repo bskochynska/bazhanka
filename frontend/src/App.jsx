@@ -7,6 +7,7 @@ import ListPage from './pages/ListPage.jsx';
 import Santa from './pages/Santa.jsx';
 import Admin from './pages/Admin.jsx';
 import Feedback from './Feedback.jsx';
+import { GiftIcon } from './icons.jsx';
 
 function RequireUser({ children }) {
   const { user } = useSession();
@@ -21,7 +22,8 @@ export default function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <Link to={user ? '/dashboard' : '/'} className="brand">🎁 Bazhanka</Link>
+        {/* The logo always leads to the main page, whether or not you are signed in. */}
+        <Link to="/" className="brand"><GiftIcon size={20} /> Bazhanka</Link>
         <nav>
           {user ? (
             <>
@@ -40,7 +42,7 @@ export default function App() {
       </header>
       <main>
         <Routes>
-          <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Home />} />
+          <Route path="/" element={<Home />} />
           <Route path="/signin" element={<Auth mode="signin" />} />
           <Route path="/signup" element={<Auth mode="signup" />} />
           <Route path="/dashboard" element={<RequireUser><Dashboard /></RequireUser>} />
@@ -54,7 +56,7 @@ export default function App() {
       <footer className="footer">
         <span>Bazhanka · a student prototype from UCU</span>
         {config.donationUrl && (
-          <a href={config.donationUrl} target="_blank" rel="noreferrer">💛 {config.donationLabel}</a>
+          <a href={config.donationUrl} target="_blank" rel="noreferrer">{config.donationLabel}</a>
         )}
       </footer>
       <Feedback />

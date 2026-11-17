@@ -1,7 +1,7 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import * as cheerio from 'cheerio';
-import { HttpError } from './util.js';
+import { HttpError, httpUrl } from './util.js';
 
 // Block requests to private / loopback networks (SSRF protection).
 function isPrivateIp(ip) {
@@ -111,26 +111,45 @@ export async function fetchPreview(rawUrl) {
         'Accept-Language': 'uk,en;q=0.8',
       },
     }).catch(() => null);
-    if (!res) throw new HttpError(502, 'The shop did not respond');
+    // 422, not 5xx: a shop that blocks or ignores us is an expected case, and the error handler
+    // hides the message of every 5xx behind "Something went wrong on our side".
+    if (!res) throw new HttpError(422, 'The shop did not respond — fill the item in by hand');
     if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
-      current = new URL(res.headers.get('location'), current);
+      try {
+        current = new URL(res.headers.get('location'), current);
+      } catch {
+        throw new HttpError(422, 'The shop sent a broken redirect — fill the item in by hand');
+      }
+      if (!['http:', 'https:'].includes(current.protocol)) throw new HttpError(422, 'The shop redirected somewhere unsupported — fill the item in by hand');
       continue;
     }
     break;
   }
-  if (!res.ok) throw new HttpError(502, `The shop answered with ${res.status}; fill the item in by hand`);
+  if (res.status >= 300 && res.status < 400) throw new HttpError(422, 'The shop redirected too many times — fill the item in by hand');
+  if (!res.ok) {
+    const blocked = res.status === 401 || res.status === 403 || res.status === 429;
+    throw new HttpError(422, blocked
+      ? 'This shop does not allow automatic reading of its pages — fill the item in by hand'
+      : `The shop answered with ${res.status} — fill the item in by hand`);
+  }
+  if (!res.body) throw new HttpError(422, 'The shop returned an empty page — fill the item in by hand');
 
   // Read at most 2 MB.
-  const reader = res.body.getReader();
-  const chunks = [];
-  let size = 0;
-  while (size < 2_000_000) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    size += value.length;
+  let html;
+  try {
+    const reader = res.body.getReader();
+    const chunks = [];
+    let size = 0;
+    while (size < 2_000_000) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      size += value.length;
+    }
+    reader.cancel().catch(() => {});
+    html = Buffer.concat(chunks).toString('utf8');
+  } catch {
+    throw new HttpError(422, 'Could not read the shop page — fill the item in by hand');
   }
-  reader.cancel().catch(() => {});
-  const html = Buffer.concat(chunks).toString('utf8');
-  return { url: current.toString(), ...extractMetadata(html, current) };
+  return { url: httpUrl(current.toString()) || current.toString(), ...extractMetadata(html, current) };
 }

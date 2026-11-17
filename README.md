@@ -1,4 +1,4 @@
-# 🎁 Bazhanka — shared wishlists with secret gift reservations
+# Bazhanka — shared wishlists with secret gift reservations
 
 **Bazhanka** ("бажанка", from *бажання*, "a wish") is a website where you create a wishlist for an occasion and share **one link**.
 Friends reserve gifts from it: other guests see an item as taken, but **the owner never sees who reserved what**, so the surprise survives.
@@ -18,12 +18,12 @@ Team: Inna Dermanska, Bohdana Skochynska, Ksenia Nimas (UCU).
 |---|---|
 | Sign up / sign in (email + password, httpOnly session cookie) | `/signup`, `/signin` |
 | Create wishlists for an occasion and share them by link (copy or Telegram) | `/dashboard`, `/l/<code>` |
-| Add an item by pasting a shop link: title, photo and price are filled in automatically (JSON-LD / Open Graph) | owner view of a list |
+| Add an item by pasting a shop link: title, photo and price are filled in automatically when the shop allows it (JSON-LD / Open Graph); otherwise fill the item in by hand | owner view of a list |
 | Secret reservation: guests see "already reserved", the owner sees nothing | guest view of a list |
 | Chip in: several guests add amounts to one gift, with a progress bar | items marked "chip-in" |
 | Secret Santa: invite link, the organiser draws names, each member sees only their giftee and their list | `/santa` |
 | "Gifts I'm giving" across all lists | `/dashboard` |
-| In-app feedback button and a metrics page for the validation goals | 💬 button, `/admin` |
+| In-app feedback button and a metrics page for the validation goals | Feedback button, `/admin` |
 
 ## Repository layout
 
@@ -125,7 +125,7 @@ docker run -p 3000:3000 -e DATABASE_URL=... -e JWT_SECRET=... bazhanka
 
 Sign in with an email listed in `ADMIN_EMAILS` and open `/admin`. It shows, live, the goals from our one-pager:
 sign-ups (goal 50), wishlists (20), % of guests who reserved (≥ 30%), % of guests who created their own list (≥ 15%),
-% of users who came back on another day (≥ 40%), and Secret Santa groups drawn (3), plus all feedback sent through the 💬 button.
+% of users who came back on another day (≥ 40%), and Secret Santa groups drawn (3), plus all feedback sent through the Feedback button.
 
 ## Privacy and security notes
 

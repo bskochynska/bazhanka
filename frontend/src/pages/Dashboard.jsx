@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, money, niceDate } from '../api.js';
 import { useSession } from '../session.jsx';
+import { GiftIcon } from '../icons.jsx';
 
 const OCCASIONS = ['Birthday', 'Christmas', 'St Nicholas Day', 'Graduation', 'New Year', 'Wedding', 'Just because'];
 
@@ -31,7 +32,7 @@ export default function Dashboard() {
 
   return (
     <div className="page">
-      <h1>Hi, {user.name} 👋</h1>
+      <h1>Hi, {user.name}</h1>
 
       <section>
         <div className="row between">
@@ -79,7 +80,7 @@ export default function Dashboard() {
           <div className="stack">
             {gifts.map((g) => (
               <Link key={g.id} to={`/l/${g.slug}`} className="card gift-row">
-                {g.imageUrl ? <img src={g.imageUrl} alt="" referrerPolicy="no-referrer" /> : <div className="ph">🎁</div>}
+                {g.imageUrl ? <img src={g.imageUrl} alt="" referrerPolicy="no-referrer" /> : <div className="ph"><GiftIcon size={28} /></div>}
                 <div>
                   <strong>{g.title}</strong>
                   <div className="muted">for {g.ownerName} · {g.listTitle}{g.eventDate ? ` · ${niceDate(g.eventDate)}` : ''}</div>

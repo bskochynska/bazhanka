@@ -52,7 +52,7 @@ function Overview() {
 
   return (
     <div className="page">
-      <h1>🎅 Secret Santa</h1>
+      <h1>Secret Santa</h1>
       <p className="lead">Invite your group, Bazhanka draws the pairs. Everyone sees only the wishlist of the person they’re gifting.</p>
       {error && <p className="error">{error}</p>}
 
@@ -117,7 +117,7 @@ function Group({ code }) {
   return (
     <div className="page">
       <div className="list-header">
-        <span className="tag">🎅 Secret Santa</span>
+        <span className="tag">Secret Santa</span>
         <h1>{g.group.name}</h1>
         <p className="muted">
           {g.members.length} members{g.group.budget ? ` · budget ${g.group.budget}` : ''}{g.group.exchangeDate ? ` · exchange ${niceDate(g.group.exchangeDate)}` : ''}
@@ -128,7 +128,7 @@ function Group({ code }) {
       {g.group.drawn && g.isMember && g.giftee && (
         <div className="card giftee">
           <p>You are Secret Santa for</p>
-          <h2>🎁 {g.giftee.name}</h2>
+          <h2>{g.giftee.name}</h2>
           {g.giftee.list ? (
             <Link className="btn" to={`/l/${g.giftee.list.slug}`}>See {g.giftee.name}’s wishlist</Link>
           ) : <p className="muted">{g.giftee.name} hasn’t attached a wishlist yet. Check back later!</p>}
@@ -151,8 +151,8 @@ function Group({ code }) {
               <div><strong>Invite people</strong><p className="muted small">Send this link to your group chat. Everyone needs to join before the draw.</p></div>
               <div className="share-row">
                 <input readOnly value={invite} onFocus={(e) => e.target.select()} />
-                <button className="btn" onClick={async () => { try { await navigator.clipboard.writeText(invite); setCopied(true); } catch { /* ignore */ } }}>{copied ? 'Copied ✓' : 'Copy'}</button>
-                <a className="btn ghost" target="_blank" rel="noreferrer" href={`https://t.me/share/url?url=${encodeURIComponent(invite)}&text=${encodeURIComponent(`Join our Secret Santa “${g.group.name}” 🎅`)}`}>Telegram</a>
+                <button className="btn" onClick={async () => { try { await navigator.clipboard.writeText(invite); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* ignore */ } }}>{copied ? 'Copied' : 'Copy'}</button>
+                <a className="btn ghost" target="_blank" rel="noreferrer" href={`https://t.me/share/url?url=${encodeURIComponent(invite)}&text=${encodeURIComponent(`Join our Secret Santa “${g.group.name}”`)}`}>Telegram</a>
               </div>
             </div>
           )}

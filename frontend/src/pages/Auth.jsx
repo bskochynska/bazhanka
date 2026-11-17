@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useSession } from '../session.jsx';
 
@@ -8,7 +8,7 @@ export default function Auth({ mode }) {
   const [params] = useSearchParams();
   const next = params.get('next') || '/dashboard';
   const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
-  const { setUser } = useSession();
+  const { user, setUser } = useSession();
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
@@ -34,6 +34,9 @@ export default function Auth({ mode }) {
       setBusy(false);
     }
   };
+
+  // Already signed in: no point showing the form again.
+  if (user) return <Navigate to={safeNext} replace />;
 
   const other = `${isSignup ? '/signin' : '/signup'}${params.get('next') ? `?next=${encodeURIComponent(safeNext)}` : ''}`;
 

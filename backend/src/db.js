@@ -1,6 +1,10 @@
 import pg from 'pg';
 
-const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/bazhanka';
+// Return DATE columns as plain 'YYYY-MM-DD' strings. By default pg builds a JS Date at local
+// midnight, and toISOString() then shifts the day back by one on servers east of UTC (e.g. Kyiv).
+pg.types.setTypeParser(1082, (v) => v);
+
+const connectionString =process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/bazhanka';
 const useSsl = process.env.DATABASE_SSL === 'true';
 
 export const pool = new pg.Pool({

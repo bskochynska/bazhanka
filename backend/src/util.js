@@ -30,15 +30,29 @@ export function num(v) {
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
 }
 
+// Advertising / tracking query parameters that only clutter a saved shop link.
+const TRACKING_PARAM = /^(utm_.+|gad_.+|gclid|gbraid|wbraid|fbclid|yclid|msclkid|_ga|_gl|mc_cid|mc_eid)$/i;
+
 export function httpUrl(v) {
   const s = str(v, 2000);
   if (!s) return null;
   try {
     const u = new URL(s);
-    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : null;
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    for (const key of [...u.searchParams.keys()]) {
+      if (TRACKING_PARAM.test(key)) u.searchParams.delete(key);
+    }
+    return u.toString();
   } catch {
     return null;
   }
+}
+
+// Route ids must be positive integers; anything else is "not found" (not a database error).
+export function intId(v) {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1 || n > 2147483647) throw new HttpError(404, 'Not found');
+  return n;
 }
 
 // Secret Santa: random derangement as a single cycle, so nobody draws themselves

@@ -3,12 +3,12 @@ import crypto from 'node:crypto';
 import { query, tx } from '../db.js';
 import { requireUser } from '../auth.js';
 import { fetchPreview } from '../preview.js';
-import { ah, HttpError, str, num, httpUrl, randomCode } from '../util.js';
+import { ah, HttpError, str, num, httpUrl, randomCode, intId } from '../util.js';
 
 const r = Router();
 
 async function ownedWishlist(id, userId) {
-  const { rows } = await query('SELECT * FROM wishlists WHERE id = $1', [id]);
+  const { rows } = await query('SELECT * FROM wishlists WHERE id = $1', [intId(id)]);
   if (!rows[0]) throw new HttpError(404, 'Wishlist not found');
   if (rows[0].owner_id !== userId) throw new HttpError(403, 'This is not your wishlist');
   return rows[0];
@@ -17,7 +17,7 @@ async function ownedWishlist(id, userId) {
 async function ownedItem(id, userId) {
   const { rows } = await query(
     'SELECT i.*, w.owner_id FROM items i JOIN wishlists w ON w.id = i.wishlist_id WHERE i.id = $1',
-    [id],
+    [intId(id)],
   );
   if (!rows[0]) throw new HttpError(404, 'Item not found');
   if (rows[0].owner_id !== userId) throw new HttpError(403, 'This is not your item');
@@ -51,7 +51,7 @@ const listOut = (w) => ({
   id: w.id,
   title: w.title,
   occasion: w.occasion,
-  eventDate: w.event_date ? w.event_date.toISOString().slice(0, 10) : null,
+  eventDate: w.event_date ? String(w.event_date).slice(0, 10) : null,
   slug: w.slug,
   itemCount: w.item_count !== undefined ? Number(w.item_count) : undefined,
 });
@@ -189,7 +189,7 @@ r.post('/items/:id/reserve', requireUser, ah(async (req, res) => {
   const result = await tx(async (c) => {
     const { rows } = await c.query(
       `SELECT i.*, w.owner_id FROM items i JOIN wishlists w ON w.id = i.wishlist_id WHERE i.id = $1 FOR UPDATE OF i`,
-      [req.params.id],
+      [intId(req.params.id)],
     );
     const item = rows[0];
     if (!item) throw new HttpError(404, 'Item not found');
@@ -214,7 +214,7 @@ r.post('/items/:id/reserve', requireUser, ah(async (req, res) => {
 }));
 
 r.delete('/items/:id/reserve', requireUser, ah(async (req, res) => {
-  await query('DELETE FROM reservations WHERE item_id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+  await query('DELETE FROM reservations WHERE item_id = $1 AND user_id = $2', [intId(req.params.id), req.user.id]);
   res.json({ ok: true });
 }));
 
@@ -242,7 +242,7 @@ r.get('/me/gifts', requireUser, ah(async (req, res) => {
       listTitle: g.list_title,
       slug: g.slug,
       ownerName: g.owner_name,
-      eventDate: g.event_date ? g.event_date.toISOString().slice(0, 10) : null,
+      eventDate: g.event_date ? String(g.event_date).slice(0, 10) : null,
     })),
   });
 }));

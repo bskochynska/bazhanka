@@ -4,7 +4,7 @@
 
 Repository: <link> · Running demo: <https URL>
 
-> Fill in real numbers from `/admin` and real quotes from interviews and the 💬 feedback button. Export to PDF for submission.
+> Fill in real numbers from `/admin` and real quotes from interviews and the Feedback button. Export to PDF for submission.
 
 ## 1. Who we showed it to
 

@@ -73,6 +73,14 @@ export default function Dashboard() {
       </section>
 
       <section>
+        <div className="card cta">
+          <h3>Don’t know what to wish for?</h3>
+          <p className="muted">Tell us what you like and get ideas from real shops — add them to your list in one tap.</p>
+          <Link to="/ideas" className="btn ghost">Get gift ideas</Link>
+        </div>
+      </section>
+
+      <section>
         <h2>Gifts I’m giving</h2>
         {gifts.length === 0 ? (
           <p className="muted">When you reserve or chip in on a friend’s gift, it shows up here so you don’t forget.</p>

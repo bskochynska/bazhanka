@@ -13,6 +13,63 @@ function Metric({ label, value, goal, ok }) {
   );
 }
 
+function Partners() {
+  const [data, setData] = useState(null);
+  const [form, setForm] = useState({ name: '', domain: '', boost: 1 });
+  const [error, setError] = useState('');
+  const load = () => api('/admin/partners').then(setData).catch((e) => setError(e.message));
+  useEffect(() => { load(); }, []);
+
+  const act = async (fn) => {
+    setError('');
+    try { await fn(); await load(); } catch (e) { setError(e.message); }
+  };
+  const add = (e) => {
+    e.preventDefault();
+    act(async () => { await api('/admin/partners', { method: 'POST', body: form }); setForm({ name: '', domain: '', boost: 1 }); });
+  };
+  if (!data) return error ? <p className="error">{error}</p> : null;
+  const t = data.totals;
+
+  return (
+    <section>
+      <h2>Gift ideas: partner shops</h2>
+      <p className="muted">Partners rank higher among results that already fit the person’s taste and always carry a “Partner” mark. Searches run: <b>{t.searches}</b> · cards shown: <b>{t.shown}</b> · clicks: <b>{t.clicks}</b> · added to lists: <b>{t.adds}</b></p>
+      <form className="card stack" onSubmit={add}>
+        <div className="grid2">
+          <label>Shop name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Example Shop" /></label>
+          <label>Domain<input required value={form.domain} onChange={(e) => setForm({ ...form, domain: e.target.value })} placeholder="example.com.ua" /></label>
+        </div>
+        <label>Boost (1–5)<input type="number" min="1" max="5" value={form.boost} onChange={(e) => setForm({ ...form, boost: e.target.value })} /></label>
+        <div><button className="btn small">Add partner</button></div>
+        {error && <p className="error">{error}</p>}
+      </form>
+      {data.partners.length > 0 && (
+        <table className="table">
+          <thead><tr><td>Shop</td><td>Boost</td><td>Shown</td><td>Clicks</td><td>Added</td><td></td></tr></thead>
+          <tbody>
+            {data.partners.map((p) => (
+              <tr key={p.id} style={{ opacity: p.active ? 1 : 0.5 }}>
+                <td><b>{p.name}</b><div className="muted small">{p.domain}</div></td>
+                <td>
+                  <select value={p.boost} onChange={(e) => act(() => api(`/admin/partners/${p.id}`, { method: 'PATCH', body: { boost: Number(e.target.value) } }))}>
+                    {[1, 2, 3, 4, 5].map((n) => <option key={n}>{n}</option>)}
+                  </select>
+                </td>
+                <td>{p.shown}</td><td>{p.clicks}</td><td>{p.adds}</td>
+                <td>
+                  <button className="link" onClick={() => act(() => api(`/admin/partners/${p.id}`, { method: 'PATCH', body: { active: !p.active } }))}>{p.active ? 'Pause' : 'Resume'}</button>{' · '}
+                  <button className="link danger" onClick={() => window.confirm(`Remove ${p.name}?`) && act(() => api(`/admin/partners/${p.id}`, { method: 'DELETE' }))}>Remove</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
 export default function Admin() {
   const [s, setS] = useState(null);
   const [error, setError] = useState('');
@@ -48,6 +105,7 @@ export default function Admin() {
           ].map(([k, v]) => <tr key={k}><td>{k}</td><td><b>{v}</b></td></tr>)}
         </tbody>
       </table>
+      <Partners />
       <h2>Sign-ups by day</h2>
       <table className="table"><tbody>{s.signupsByDay.map((d) => <tr key={d.day}><td>{d.day}</td><td>{d.n}</td></tr>)}</tbody></table>
       <h2>Feedback ({s.feedback.length})</h2>

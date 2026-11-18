@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.js';
 import wishlistRoutes from './routes/wishlists.js';
 import santaRoutes from './routes/santa.js';
 import miscRoutes from './routes/misc.js';
+import discoverRoutes from './routes/discover.js';
 
 const app = express();
 app.set('trust proxy', 1); // behind Render/Fly HTTPS proxy
@@ -28,6 +29,7 @@ app.get('/healthz', async (_req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/santa', santaRoutes);
+app.use('/api', discoverRoutes);
 app.use('/api', wishlistRoutes);
 app.use('/api', miscRoutes);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found' }));

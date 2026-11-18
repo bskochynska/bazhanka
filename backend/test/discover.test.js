@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { parseCandidates, rankOffers, findPartner, cacheKey, buildPrompt, normDomain } from '../src/discover.js';
+import { parseCandidates, rankOffers, findPartner, cacheKey, buildPrompt, normDomain, baseDomain } from '../src/discover.js';
 import { signRequest, signingKey } from '../src/bedrock.js';
 
 const partners = [
@@ -42,6 +42,22 @@ test('parseCandidates tolerates fences/prose and drops junk and duplicates', () 
 test('parseCandidates keeps a price only when it is a positive number', () => {
   const out = parseCandidates('[{"title":"A","url":"https://a.example/1","price":1299.5,"currency":"uah"},{"title":"B","url":"https://b.example/1","price":"abc","currency":"zz"},{"title":"C","url":"https://c.example/1","price":null}]');
   assert.deepEqual(out.map((o) => [o.seenPrice, o.seenCurrency]), [[1299.5, 'UAH'], [null, null], [null, null]]);
+});
+
+test('parseCandidates salvages complete items from a reply cut off mid-array', () => {
+  const text = 'Sure! [{"title":"A","url":"https://a.example/1","why":"has } brace"},{"title":"B","url":"https://b.example/2","fit":"adjacent"},{"title":"C","url":"https://c.exa';
+  const out = parseCandidates(text);
+  assert.deepEqual(out.map((o) => o.title), ['A', 'B']);
+  assert.equal(out[0].why, 'has } brace');
+  assert.deepEqual(parseCandidates('{"title":"Solo","url":"https://s.example/1"}').map((o) => o.title), ['Solo']);
+});
+
+test('baseDomain compares shops by registrable domain', () => {
+  assert.equal(baseDomain('m.rozetka.com.ua'), 'rozetka.com.ua');
+  assert.equal(baseDomain('www.shop.ua'), 'www.shop.ua'.split('.').slice(-2).join('.'));
+  assert.equal(baseDomain('a.b.example.com'), 'example.com');
+  assert.equal(baseDomain('example.com'), 'example.com');
+  assert.equal(baseDomain(null), null);
 });
 
 test('partner matching covers subdomains and ignores inactive partners in ranking', () => {

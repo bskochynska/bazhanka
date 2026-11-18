@@ -25,9 +25,12 @@ function Check() {
       <div className="row"><button type="button" className="btn ghost small" disabled={busy} onClick={run}>{busy ? 'Checking…' : 'Test AI search'}</button></div>
       {res && (
         <p className={res.ok ? 'notice' : 'error'}>
-          {res.ok ? `Works (${res.ms} ms, ${res.citations} sources). ` : `Failed${res.kind ? ` [${res.kind}]` : ''}: ${res.error}. `}
+          {res.ok ? `Works (${res.ms} ms): ${res.offers} offers kept. ` : `Failed${res.kind ? ` [${res.kind}]` : ''}: ${res.error}. `}
           {res.region && <span className="muted">{res.region} · {res.modelId}</span>}
         </p>
+      )}
+      {res?.debug?.candidates !== undefined && (
+        <pre className="small" style={{ whiteSpace: 'pre-wrap', background: 'var(--cream)', padding: 10, borderRadius: 6 }}>{JSON.stringify(res.debug, null, 2)}</pre>
       )}
     </div>
   );

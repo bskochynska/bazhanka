@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { requireUser, isAdmin } from '../auth.js';
-import { hasAwsCredentials, converseWithWebSearch, bedrockConfig } from '../bedrock.js';
+import { hasAwsCredentials, bedrockConfig } from '../bedrock.js';
 import { cacheKey, findPartner, hostOf, normDomain, rankOffers, searchOffers } from '../discover.js';
 import { ah, HttpError, str, num, httpUrl, intId } from '../util.js';
 
@@ -131,11 +131,12 @@ r.get('/admin/discover-check', requireUser, adminOnly, ah(async (_req, res) => {
   const out = { region: cfg.region, modelId: cfg.modelId, enabled: enabled(), mock: process.env.DISCOVER_MOCK === 'true', credentials: hasAwsCredentials() };
   if (!out.credentials) return res.json({ ...out, ok: false, kind: 'credentials', error: 'No AWS credentials in this environment' });
   const t0 = Date.now();
+  const debug = {};
   try {
-    const { text, citations } = await converseWithWebSearch({ system: 'Answer in one short sentence.', prompt: 'Use web search: what is the capital of Ukraine?', maxTokens: 120, timeoutMs: 30_000 });
-    res.json({ ...out, ok: true, ms: Date.now() - t0, sample: text.slice(0, 120), citations: citations.length });
+    const offers = await searchOffers({ interests: 'coffee', budget: null, currency: 'UAH' }, await activePartners(), debug);
+    res.json({ ...out, ok: true, ms: Date.now() - t0, offers: offers.length, debug });
   } catch (e) {
-    res.json({ ...out, ok: false, ms: Date.now() - t0, kind: e.kind || 'unknown', error: e.message });
+    res.json({ ...out, ok: false, ms: Date.now() - t0, kind: e.kind || 'unknown', error: e.message, debug });
   }
 }));
 

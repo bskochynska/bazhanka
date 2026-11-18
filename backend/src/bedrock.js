@@ -6,6 +6,13 @@ import crypto from 'node:crypto';
 const sha256hex = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const hmac = (key, s) => crypto.createHmac('sha256', key).update(s).digest();
 
+export class DiscoverError extends Error {
+  constructor(kind, message) {
+    super(message);
+    this.kind = kind; // network | timeout | access | throttled | model | bedrock
+  }
+}
+
 export function bedrockConfig() {
   return {
     region: process.env.BEDROCK_REGION || 'us-east-1',
@@ -70,9 +77,20 @@ export async function converseWithWebSearch({ system, prompt, maxTokens = 1800, 
   });
   delete headers.host; // set by fetch
 
-  const res = await fetch(`https://${host}${path}`, { method: 'POST', headers, body, signal: AbortSignal.timeout(timeoutMs) });
+  let res;
+  try {
+    res = await fetch(`https://${host}${path}`, { method: 'POST', headers, body, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (e) {
+    // No route to the internet from a VPC Lambda looks exactly like this (connect timeout / ENETUNREACH).
+    const timedOut = e.name === 'TimeoutError' || e.name === 'AbortError';
+    throw new DiscoverError(timedOut ? 'timeout' : 'network', `Could not reach Bedrock at ${host}: ${e.cause?.code || e.message}`);
+  }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Bedrock ${res.status}: ${data.message || data.Message || 'request failed'}`);
+  if (!res.ok) {
+    const msg = data.message || data.Message || 'request failed';
+    const kind = res.status === 403 ? 'access' : res.status === 429 ? 'throttled' : res.status === 400 || res.status === 404 ? 'model' : 'bedrock';
+    throw new DiscoverError(kind, `Bedrock ${res.status}: ${msg}`);
+  }
 
   let text = '';
   const citations = [];

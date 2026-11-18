@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { requireUser, isAdmin } from '../auth.js';
-import { hasAwsCredentials } from '../bedrock.js';
+import { hasAwsCredentials, converseWithWebSearch, bedrockConfig } from '../bedrock.js';
 import { cacheKey, findPartner, hostOf, normDomain, rankOffers, searchOffers } from '../discover.js';
 import { ah, HttpError, str, num, httpUrl, intId } from '../util.js';
 
@@ -66,9 +66,9 @@ r.post('/discover/search', requireUser, ah(async (req, res) => {
     try {
       offers = await searchOffers(params, await activePartners());
     } catch (e) {
-      console.error('discover search failed:', e.message);
+      console.error('discover search failed:', e.kind || '', e.message);
       await query(`DELETE FROM discover_runs WHERE id = (SELECT max(id) FROM discover_runs WHERE user_id = $1)`, [req.user.id]).catch(() => {});
-      throw new HttpError(502, 'The idea search is not available right now — please try again in a minute');
+      throw new HttpError(502, `The idea search is not available right now — please try again in a minute${e.kind ? ` (${e.kind})` : ''}`);
     }
     if (offers.length) {
       await query(
@@ -124,6 +124,20 @@ r.post('/discover/add', requireUser, ah(async (req, res) => {
 // ---- Admin: partner shops and their funnel ----
 
 const adminOnly = (req, _res, next) => (isAdmin(req.user) ? next() : next(new HttpError(403, 'Admins only')));
+
+// One-click health check for admins: tells which step fails (network / permissions / model).
+r.get('/admin/discover-check', requireUser, adminOnly, ah(async (_req, res) => {
+  const cfg = bedrockConfig();
+  const out = { region: cfg.region, modelId: cfg.modelId, enabled: enabled(), mock: process.env.DISCOVER_MOCK === 'true', credentials: hasAwsCredentials() };
+  if (!out.credentials) return res.json({ ...out, ok: false, kind: 'credentials', error: 'No AWS credentials in this environment' });
+  const t0 = Date.now();
+  try {
+    const { text, citations } = await converseWithWebSearch({ system: 'Answer in one short sentence.', prompt: 'Use web search: what is the capital of Ukraine?', maxTokens: 120, timeoutMs: 30_000 });
+    res.json({ ...out, ok: true, ms: Date.now() - t0, sample: text.slice(0, 120), citations: citations.length });
+  } catch (e) {
+    res.json({ ...out, ok: false, ms: Date.now() - t0, kind: e.kind || 'unknown', error: e.message });
+  }
+}));
 
 const partnerOut = (p) => ({
   id: p.id, name: p.name, domain: p.domain, boost: p.boost, active: p.active,

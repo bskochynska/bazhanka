@@ -13,6 +13,26 @@ function Metric({ label, value, goal, ok }) {
   );
 }
 
+function Check() {
+  const [res, setRes] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try { setRes(await api('/admin/discover-check')); } catch (e) { setRes({ ok: false, error: e.message }); } finally { setBusy(false); }
+  };
+  return (
+    <div className="stack" style={{ marginBottom: 12 }}>
+      <div className="row"><button type="button" className="btn ghost small" disabled={busy} onClick={run}>{busy ? 'Checking…' : 'Test AI search'}</button></div>
+      {res && (
+        <p className={res.ok ? 'notice' : 'error'}>
+          {res.ok ? `Works (${res.ms} ms, ${res.citations} sources). ` : `Failed${res.kind ? ` [${res.kind}]` : ''}: ${res.error}. `}
+          {res.region && <span className="muted">{res.region} · {res.modelId}</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Partners() {
   const [data, setData] = useState(null);
   const [form, setForm] = useState({ name: '', domain: '', boost: 1 });
@@ -35,6 +55,7 @@ function Partners() {
     <section>
       <h2>Gift ideas: partner shops</h2>
       <p className="muted">Partners rank higher among results that already fit the person’s taste and always carry a “Partner” mark. Searches run: <b>{t.searches}</b> · cards shown: <b>{t.shown}</b> · clicks: <b>{t.clicks}</b> · added to lists: <b>{t.adds}</b></p>
+      <Check />
       <form className="card stack" onSubmit={add}>
         <div className="grid2">
           <label>Shop name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Example Shop" /></label>

@@ -29,7 +29,7 @@ export function cacheKey({ interests, budget, currency }) {
 export const SYSTEM_PROMPT = `You are a gift-idea scout for a wishlist website used mostly in Ukraine.
 Use web search to find REAL products that can be bought online right now. Never invent products, shops or links.
 Reply with ONLY a JSON array (no prose, no markdown). Each element:
-{"title": string, "url": string (direct product page you found), "fit": "direct" | "adjacent", "why": string (max 140 chars, same language as the user's interests)}
+{"title": string, "url": string (direct product page you found), "fit": "direct" | "adjacent", "why": string (max 140 chars, same language as the user's interests), "price": number or null (only if you saw it in the search results, otherwise null), "currency": "UAH" | "USD" | "EUR" | null}
 - "direct": clearly matches the person's interests.
 - "adjacent": not exactly what they asked for, but related enough to be a pleasant discovery.
 Give 8 to 10 items, a mix of about 70% direct and 30% adjacent, from different shops. Prefer shops that deliver in Ukraine.`;
@@ -64,6 +64,8 @@ export function parseCandidates(text) {
       url,
       fit: c.fit === 'adjacent' ? 'adjacent' : 'direct',
       why: typeof c.why === 'string' ? c.why.trim().slice(0, 200) : '',
+      seenPrice: Number.isFinite(Number(c.price)) && Number(c.price) > 0 ? Math.round(Number(c.price) * 100) / 100 : null,
+      seenCurrency: typeof c.currency === 'string' && /^[A-Za-z]{3}$/.test(c.currency) ? c.currency.toUpperCase() : null,
     });
   }
   return out;
@@ -94,6 +96,8 @@ export function rankOffers(offers, partners) {
 
 // ---------- search pipeline ----------
 
+const strip = ({ seenPrice, seenCurrency, ...o }) => o;
+
 // Keep a candidate only if its shop actually showed up in the search citations; then read the
 // real page for title / image / price instead of trusting the model's numbers.
 async function verify(candidates, citations) {
@@ -104,11 +108,12 @@ async function verify(candidates, citations) {
     try {
       const p = await fetchPreview(c.url);
       if (!p.title) return null;
-      return { ...c, url: p.url, title: p.title || c.title, imageUrl: p.image || null, price: p.price || null, currency: p.currency || null, verified: true };
+      return strip({ ...c, url: p.url, title: p.title || c.title, imageUrl: p.image || null, price: p.price || null, currency: p.currency || null, verified: true });
     } catch {
-      // Shop blocks automatic reading (common for big stores). The page was returned by search,
-      // so keep it, but show no price or image because we cannot confirm them.
-      return { ...c, imageUrl: null, price: null, currency: null, verified: false };
+      // The shop blocks automatic reading (common for big stores) - we respect that and do not
+      // disguise the bot. The page was returned by search, so keep it. A price the search results
+      // showed is kept but flagged as approximate; there is no photo.
+      return strip({ ...c, imageUrl: null, price: c.seenPrice, currency: c.seenPrice ? c.seenCurrency || 'UAH' : null, priceApprox: !!c.seenPrice, verified: false });
     }
   }));
   return checked.filter(Boolean);

@@ -39,6 +39,11 @@ test('parseCandidates tolerates fences/prose and drops junk and duplicates', () 
   assert.deepEqual(parseCandidates('[broken'), []);
 });
 
+test('parseCandidates keeps a price only when it is a positive number', () => {
+  const out = parseCandidates('[{"title":"A","url":"https://a.example/1","price":1299.5,"currency":"uah"},{"title":"B","url":"https://b.example/1","price":"abc","currency":"zz"},{"title":"C","url":"https://c.example/1","price":null}]');
+  assert.deepEqual(out.map((o) => [o.seenPrice, o.seenCurrency]), [[1299.5, 'UAH'], [null, null], [null, null]]);
+});
+
 test('partner matching covers subdomains and ignores inactive partners in ranking', () => {
   assert.equal(findPartner('shop.partner-shop.example.ua', partners).id, 1);
   assert.equal(findPartner('notpartner-shop.example.ua', partners), null);

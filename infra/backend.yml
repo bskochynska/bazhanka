@@ -1,0 +1,306 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Bazhanka backend on AWS: Lambda (Node.js 22 + Express via Web Adapter) behind
+  a Function URL, talking to an Aurora Serverless v2 PostgreSQL cluster.
+Parameters:
+  ProjectName:
+    Type: String
+    Default: bazhanka
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  ImageUri:
+    Type: String
+  Architecture:
+    Type: String
+    Default: x86_64
+    AllowedValues: [x86_64, arm64]
+  MemorySize:
+    Type: Number
+    Default: 512
+  DbEngineVersion:
+    Type: String
+    Default: ""
+  DbMinCapacity:
+    Type: Number
+    Default: 0
+  DbMaxCapacity:
+    Type: Number
+    Default: 1
+  DbAutoPauseSeconds:
+    Type: Number
+    Default: 300
+  DbName:
+    Type: String
+    Default: bazhanka
+  DbUsername:
+    Type: String
+    Default: app
+  DbPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 41
+    AllowedPattern: "[a-zA-Z0-9_-]+"
+  JwtSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+  AdminEmails:
+    Type: String
+    Default: ""
+  DonationUrl:
+    Type: String
+    Default: ""
+  DonationLabel:
+    Type: String
+    Default: "Support a volunteer cause"
+  DiscoverEnabled:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Switch the AI gift-ideas search (Amazon Nova + web grounding) on or off
+  CreateBedrockEndpoint:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      The function runs in a VPC without a NAT gateway, so it cannot reach the internet. This adds a
+      VPC interface endpoint for Bedrock Runtime (about $7/month for one subnet) so the AI search works.
+      Set to false if the VPC already has a NAT gateway or a bedrock-runtime endpoint.
+  DiscoverModelId:
+    Type: String
+    Default: us.amazon.nova-2-lite-v1:0
+    Description: Bedrock model / inference profile with web grounding (US regions only)
+  DiscoverDailyLimit:
+    Type: Number
+    Default: 5
+    Description: Fresh (non-cached) searches per user per day, a cost guard
+
+Conditions:
+  HasDbEngineVersion: !Not [!Equals [!Ref DbEngineVersion, ""]]
+  CreateBedrockEndpoint: !Equals [!Ref CreateBedrockEndpoint, "true"]
+
+Resources:
+  FunctionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${ProjectName} backend function"
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-function"
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${ProjectName} database"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref FunctionSecurityGroup
+          Description: PostgreSQL from the backend function
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-db"
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  BedrockEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateBedrockEndpoint
+    Properties:
+      GroupDescription: !Sub "${ProjectName} bedrock-runtime endpoint"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref FunctionSecurityGroup
+          Description: HTTPS from the backend function
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-bedrock-endpoint"
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  # One subnet only to keep the cost low; with private DNS the function reaches it from any AZ.
+  BedrockRuntimeEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateBedrockEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.bedrock-runtime"
+      SubnetIds:
+        - !Select [0, !Ref SubnetIds]
+      SecurityGroupIds:
+        - !Ref BedrockEndpointSecurityGroup
+      PrivateDnsEnabled: true
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub "${ProjectName}-db"
+      DBSubnetGroupDescription: !Sub "${ProjectName} database subnets"
+      SubnetIds: !Ref SubnetIds
+      Tags:
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  DbCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DBClusterIdentifier: !Sub "${ProjectName}-db"
+      Engine: aurora-postgresql
+      EngineVersion: !If [HasDbEngineVersion, !Ref DbEngineVersion, !Ref "AWS::NoValue"]
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref DbSecurityGroup
+      DatabaseName: !Ref DbName
+      MasterUsername: !Ref DbUsername
+      MasterUserPassword: !Ref DbPassword
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: !Ref DbMinCapacity
+        MaxCapacity: !Ref DbMaxCapacity
+        SecondsUntilAutoPause: !Ref DbAutoPauseSeconds
+      BackupRetentionPeriod: 1
+      DeletionProtection: false
+      Tags:
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  DbInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DBInstanceIdentifier: !Sub "${ProjectName}-db-1"
+      DBClusterIdentifier: !Ref DbCluster
+      Engine: aurora-postgresql
+      DBInstanceClass: db.serverless
+      PubliclyAccessible: false
+      AutoMinorVersionUpgrade: true
+      Tags:
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  FunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: bedrock-gift-ideas
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # US cross-region inference profile of the model, and the model in the regions it routes to.
+              - Effect: Allow
+                Action: [bedrock:InvokeModel]
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/${DiscoverModelId}"
+                  - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
+              # Nova web grounding is a Bedrock system tool and needs its own permission.
+              - Effect: Allow
+                Action: [bedrock:InvokeTool]
+                Resource: !Sub "arn:${AWS::Partition}:bedrock::${AWS::AccountId}:system-tool/amazon.nova_grounding"
+      Tags:
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProjectName}-backend"
+      RetentionInDays: 7
+      Tags:
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  ApiFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: [DbInstance]
+    Properties:
+      FunctionName: !Sub "${ProjectName}-backend"
+      Description: Bazhanka API (Node.js Express via Lambda Web Adapter)
+      PackageType: Image
+      Code:
+        ImageUri: !Ref ImageUri
+      Architectures:
+        - !Ref Architecture
+      Role: !GetAtt FunctionRole.Arn
+      MemorySize: !Ref MemorySize
+      Timeout: 60
+      LoggingConfig:
+        LogGroup: !Ref LogGroup
+      VpcConfig:
+        SubnetIds: !Ref SubnetIds
+        SecurityGroupIds:
+          - !Ref FunctionSecurityGroup
+      Environment:
+        Variables:
+          NODE_ENV: production
+          PORT: "3000"
+          DATABASE_SSL: "true"
+          DATABASE_URL: !Sub
+            - "postgres://${DbUsername}:${DbPassword}@${Endpoint}:${Port}/${DbName}"
+            - Endpoint: !GetAtt DbCluster.Endpoint.Address
+              Port: !GetAtt DbCluster.Endpoint.Port
+          JWT_SECRET: !Ref JwtSecret
+          ADMIN_EMAILS: !Ref AdminEmails
+          DONATION_URL: !Ref DonationUrl
+          DONATION_LABEL: !Ref DonationLabel
+          DISCOVER_ENABLED: !Ref DiscoverEnabled
+          DISCOVER_MODEL_ID: !Ref DiscoverModelId
+          DISCOVER_DAILY_LIMIT: !Ref DiscoverDailyLimit
+          BEDROCK_REGION: !Ref "AWS::Region"
+      Tags:
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  FunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt ApiFunction.Arn
+      AuthType: NONE
+      InvokeMode: BUFFERED
+
+  FunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ApiFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  FunctionUrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ApiFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      InvokedViaFunctionUrl: true
+
+Outputs:
+  ApiUrl:
+    Value: !Sub ["https://${Host}", {Host: !Select [2, !Split ["/", !GetAtt FunctionUrl.FunctionUrl]]}]
+  FunctionUrlDomain:
+    Value: !Select [2, !Split ["/", !GetAtt FunctionUrl.FunctionUrl]]
+  DatabaseEndpoint:
+    Value: !GetAtt DbCluster.Endpoint.Address
+  FunctionName:
+    Value: !Ref ApiFunction

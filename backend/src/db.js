@@ -117,6 +117,43 @@ CREATE TABLE IF NOT EXISTS feedback (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- "Ideas" (discover): shops that pay for promotion, cached AI searches, usage log and funnel events.
+CREATE TABLE IF NOT EXISTS partners (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  domain TEXT NOT NULL UNIQUE,      -- bare host, e.g. "rozetka.com.ua"; subdomains match too
+  boost INT NOT NULL DEFAULT 1,     -- ranking weight among relevant results (1-5)
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS discover_cache (
+  cache_key TEXT PRIMARY KEY,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS discover_runs (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  cached BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS discover_events (
+  id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id) ON DELETE SET NULL,
+  kind TEXT NOT NULL,               -- 'shown' | 'click' | 'add'
+  domain TEXT,
+  partner_id INT REFERENCES partners(id) ON DELETE SET NULL,
+  label TEXT,                       -- 'match' | 'new'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE items ADD COLUMN IF NOT EXISTS source TEXT;  -- e.g. 'discover', 'discover:partner'
+
+CREATE INDEX IF NOT EXISTS idx_runs_user ON discover_runs(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_events_partner ON discover_events(partner_id, kind);
 CREATE INDEX IF NOT EXISTS idx_items_wishlist ON items(wishlist_id);
 CREATE INDEX IF NOT EXISTS idx_res_item ON reservations(item_id);
 CREATE INDEX IF NOT EXISTS idx_views_list ON list_views(wishlist_id);

@@ -43,7 +43,7 @@ Reply with ONLY a JSON array (no prose, no markdown). Each element:
 {"title": string, "url": string (direct product page you found), "fit": "direct" | "adjacent", "why": string (max 140 chars, same language as the user's interests), "price": number or null (only if you saw it in the search results, otherwise null), "currency": "UAH" | "USD" | "EUR" | null}
 - "direct": clearly matches the person's interests.
 - "adjacent": not exactly what they asked for, but related enough to be a pleasant discovery.
-Output the JSON array and nothing else: no introduction, no explanations, no citations inside the text. Give 8 to 10 items, a mix of about 70% direct and 30% adjacent, from different shops. Prefer shops that deliver in Ukraine.`;
+Output the JSON array and nothing else: no introduction, no explanations. Give 8 to 10 items, a mix of about 70% direct and 30% adjacent, from different shops. Prefer shops that deliver in Ukraine.`;
 
 export function buildPrompt({ interests, budget, currency }, partners) {
   const lines = [`Interests / who the gift is for: ${interests}`];
@@ -128,23 +128,29 @@ export function rankOffers(offers, partners) {
 
 const strip = ({ seenPrice, seenCurrency, ...o }) => o;
 
-// Keep a candidate only if its shop actually showed up in the search citations (compared by
-// registrable domain, so "m.shop.ua" matches "shop.ua"); then read the real page for title / image
-// / price instead of trusting the model's numbers.
+// Decide which candidates to show.
+// - Candidates whose page can be read are verified from the real page (title / image / price).
+// - A page that answers 404/410 is a dead (probably invented) link and is dropped.
+// - Pages we cannot read (shop blocks bots, or no internet from the server) are kept as
+//   "unverified" - but only if the shop appeared in the search citations. If the model returned
+//   no citations at all we cannot apply that check, so they are kept and flagged as unverified.
 async function verify(candidates, citations, debug) {
   const cited = new Set(citations.flatMap((c) => [baseDomain(hostOf(c.url)), baseDomain(normDomain(c.domain))]).filter(Boolean));
+  const useCitations = cited.size > 0;
+  debug.useCitations = useCitations;
   const checked = await Promise.all(candidates.slice(0, 12).map(async (c) => {
     const host = hostOf(c.url);
-    if (!host || !cited.has(baseDomain(host))) { debug.notCited.push(host); return null; }
+    if (!host) return null;
+    if (useCitations && !cited.has(baseDomain(host))) { debug.notCited.push(host); return null; }
     try {
       const p = await fetchPreview(c.url);
       if (!p.title) { debug.noTitle++; return null; }
       debug.verified++;
       return strip({ ...c, url: p.url, title: p.title || c.title, imageUrl: p.image || null, price: p.price || null, currency: p.currency || null, verified: true });
-    } catch {
-      // The shop blocks automatic reading (common for big stores) - we respect that and do not
-      // disguise the bot. The page was returned by search, so keep it. A price the search results
-      // showed is kept but flagged as approximate; there is no photo.
+    } catch (e) {
+      if (/answered with (404|410)\b/.test(e.message || '')) { debug.deadLinks++; return null; }
+      // We respect shops that block automatic reading and do not disguise the bot. A price the
+      // search showed is kept but flagged as approximate; there is no photo.
       debug.unreadable++;
       return strip({ ...c, imageUrl: null, price: c.seenPrice, currency: c.seenPrice ? c.seenCurrency || 'UAH' : null, priceApprox: !!c.seenPrice, verified: false });
     }
@@ -155,7 +161,7 @@ async function verify(candidates, citations, debug) {
 // `debug` (optional) is filled with counters so an admin can see where results disappear.
 export async function searchOffers(params, partners, debug = {}) {
   if (process.env.DISCOVER_MOCK === 'true') return mockOffers(params);
-  const { text, citations } = await converseWithWebSearch({
+  const { text, citations, shape } = await converseWithWebSearch({
     system: SYSTEM_PROMPT,
     prompt: buildPrompt(params, partners),
   });
@@ -163,11 +169,11 @@ export async function searchOffers(params, partners, debug = {}) {
   Object.assign(debug, {
     textLength: text.length, textHead: text.slice(0, 500), candidates: candidates.length,
     citations: citations.length, citedSample: citations.slice(0, 6).map((c) => c.url),
-    notCited: [], noTitle: 0, verified: 0, unreadable: 0,
+    notCited: [], noTitle: 0, verified: 0, unreadable: 0, deadLinks: 0, shape,
   });
   const offers = await verify(candidates, citations, debug);
   debug.kept = offers.length;
-  console.log('discover:', JSON.stringify({ text: text.length, candidates: candidates.length, citations: citations.length, notCited: debug.notCited.length, verified: debug.verified, unreadable: debug.unreadable, kept: offers.length }));
+  console.log('discover:', JSON.stringify({ text: text.length, candidates: candidates.length, citations: citations.length, citedFilter: debug.useCitations, notCited: debug.notCited.length, verified: debug.verified, unreadable: debug.unreadable, deadLinks: debug.deadLinks, kept: offers.length }));
   return offers;
 }
 

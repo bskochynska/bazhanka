@@ -55,7 +55,7 @@ export function signRequest({ method = 'POST', host, path, region, service = 'be
   };
 }
 
-// Calls Converse with Amazon Nova web grounding enabled. Returns { text, citations: [{url, domain}] }.
+// Calls Converse with Amazon Nova web grounding enabled. Returns { text, citations: [{url, domain}], shape }.
 export async function converseWithWebSearch({ system, prompt, maxTokens = 3000, timeoutMs = 45_000 }) {
   if (!hasAwsCredentials()) throw new Error('AWS credentials are not available');
   const { region, modelId } = bedrockConfig();
@@ -93,14 +93,22 @@ export async function converseWithWebSearch({ system, prompt, maxTokens = 3000, 
   }
 
   let text = '';
-  const citations = [];
-  for (const block of data.output?.message?.content || []) {
-    if (block.text) text += block.text;
-    const list = Array.isArray(block.citationsContent) ? block.citationsContent : block.citationsContent?.citations || [];
-    for (const c of list) {
-      const web = c.location?.web;
-      if (web?.url) citations.push({ url: web.url, domain: web.domain || null });
-    }
-  }
-  return { text, citations };
+  for (const block of data.output?.message?.content || []) if (block.text) text += block.text;
+  return {
+    text,
+    citations: collectCitations(data.output),
+    // Shape info for diagnostics only (no content).
+    shape: { stopReason: data.stopReason, blocks: (data.output?.message?.content || []).map((b) => Object.keys(b).join('+')) },
+  };
+}
+
+// Finds every web source in a response, wherever the model put it (citationsContent as an array or
+// as { citations: [...] }, in text blocks or in separate blocks): any object with location.web.url.
+export function collectCitations(node, out = [], seen = new Set()) {
+  if (!node || typeof node !== 'object') return out;
+  if (Array.isArray(node)) { node.forEach((n) => collectCitations(n, out, seen)); return out; }
+  const web = node.location?.web || (node.web && typeof node.web === 'object' ? node.web : null);
+  if (web?.url && !seen.has(web.url)) { seen.add(web.url); out.push({ url: web.url, domain: web.domain || null }); }
+  for (const v of Object.values(node)) if (v && typeof v === 'object') collectCitations(v, out, seen);
+  return out;
 }

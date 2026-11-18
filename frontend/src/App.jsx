@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import ListPage from './pages/ListPage.jsx';
 import Santa from './pages/Santa.jsx';
 import Admin from './pages/Admin.jsx';
+import Discover from './pages/Discover.jsx';
 import Feedback from './Feedback.jsx';
 import { GiftIcon } from './icons.jsx';
 
@@ -29,6 +30,7 @@ export default function App() {
           {user ? (
             <>
               <NavLink to="/dashboard">My lists</NavLink>
+              <NavLink to="/ideas">Gift ideas</NavLink>
               <NavLink to="/santa">Secret Santa</NavLink>
               {user.isAdmin && <NavLink to="/admin">Stats</NavLink>}
               <button className="link" onClick={logout}>Sign out</button>
@@ -48,6 +50,7 @@ export default function App() {
           <Route path="/signup" element={<Auth mode="signup" />} />
           <Route path="/dashboard" element={<RequireUser><Dashboard /></RequireUser>} />
           <Route path="/l/:slug" element={<ListPage />} />
+          <Route path="/ideas" element={<RequireUser><Discover /></RequireUser>} />
           <Route path="/santa" element={<RequireUser><Santa /></RequireUser>} />
           <Route path="/santa/:code" element={<RequireUser><Santa /></RequireUser>} />
           <Route path="/admin" element={<RequireUser><Admin /></RequireUser>} />

@@ -56,9 +56,31 @@ Parameters:
   DonationLabel:
     Type: String
     Default: "Support a volunteer cause"
+  DiscoverEnabled:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Switch the AI gift-ideas search (Amazon Nova + web grounding) on or off
+  CreateBedrockEndpoint:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      The function runs in a VPC without a NAT gateway, so it cannot reach the internet. This adds a
+      VPC interface endpoint for Bedrock Runtime (about $7/month for one subnet) so the AI search works.
+      Set to false if the VPC already has a NAT gateway or a bedrock-runtime endpoint.
+  DiscoverModelId:
+    Type: String
+    Default: us.amazon.nova-2-lite-v1:0
+    Description: Bedrock model / inference profile with web grounding (US regions only)
+  DiscoverDailyLimit:
+    Type: Number
+    Default: 5
+    Description: Fresh (non-cached) searches per user per day, a cost guard
 
 Conditions:
   HasDbEngineVersion: !Not [!Equals [!Ref DbEngineVersion, ""]]
+  CreateBedrockEndpoint: !Equals [!Ref CreateBedrockEndpoint, "true"]
 
 Resources:
   FunctionSecurityGroup:
@@ -88,6 +110,38 @@ Resources:
           Value: !Sub "${ProjectName}-db"
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
+
+  BedrockEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateBedrockEndpoint
+    Properties:
+      GroupDescription: !Sub "${ProjectName} bedrock-runtime endpoint"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref FunctionSecurityGroup
+          Description: HTTPS from the backend function
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-bedrock-endpoint"
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  # One subnet only to keep the cost low; with private DNS the function reaches it from any AZ.
+  BedrockRuntimeEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateBedrockEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.bedrock-runtime"
+      SubnetIds:
+        - !Select [0, !Ref SubnetIds]
+      SecurityGroupIds:
+        - !Ref BedrockEndpointSecurityGroup
+      PrivateDnsEnabled: true
 
   DbSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -149,6 +203,21 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: bedrock-gift-ideas
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # US cross-region inference profile of the model, and the model in the regions it routes to.
+              - Effect: Allow
+                Action: [bedrock:InvokeModel]
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/${DiscoverModelId}"
+                  - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
+              # Nova web grounding is a Bedrock system tool and needs its own permission.
+              - Effect: Allow
+                Action: [bedrock:InvokeTool]
+                Resource: !Sub "arn:${AWS::Partition}:bedrock::${AWS::AccountId}:system-tool/amazon.nova_grounding"
       Tags:
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
@@ -164,7 +233,7 @@ Resources:
 
   ApiFunction:
     Type: AWS::Lambda::Function
-    DependsOn: DbInstance
+    DependsOn: [DbInstance]
     Properties:
       FunctionName: !Sub "${ProjectName}-backend"
       Description: Bazhanka API (Node.js Express via Lambda Web Adapter)
@@ -195,6 +264,10 @@ Resources:
           ADMIN_EMAILS: !Ref AdminEmails
           DONATION_URL: !Ref DonationUrl
           DONATION_LABEL: !Ref DonationLabel
+          DISCOVER_ENABLED: !Ref DiscoverEnabled
+          DISCOVER_MODEL_ID: !Ref DiscoverModelId
+          DISCOVER_DAILY_LIMIT: !Ref DiscoverDailyLimit
+          BEDROCK_REGION: !Ref "AWS::Region"
       Tags:
         - Key: PROJECT_NAME
           Value: !Ref ProjectName

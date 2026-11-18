@@ -107,6 +107,8 @@ Resources:
             CustomOriginConfig:
               HTTPSPort: 443
               OriginProtocolPolicy: https-only
+              # Gift-idea search calls an AI model with live web search and can take 20-40 s.
+              OriginReadTimeout: 60
         CacheBehaviors:
           - PathPattern: /api/*
             TargetOriginId: api

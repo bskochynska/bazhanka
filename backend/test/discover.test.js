@@ -4,7 +4,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { parseCandidates, rankOffers, findPartner, cacheKey, buildPrompt, normDomain, baseDomain } from '../src/discover.js';
-import { signRequest, signingKey } from '../src/bedrock.js';
+import { signRequest, signingKey, collectCitations } from '../src/bedrock.js';
 
 const partners = [
   { id: 1, name: 'Partner Shop', domain: 'partner-shop.example.ua', boost: 3, active: true },
@@ -50,6 +50,15 @@ test('parseCandidates salvages complete items from a reply cut off mid-array', (
   assert.deepEqual(out.map((o) => o.title), ['A', 'B']);
   assert.equal(out[0].why, 'has } brace');
   assert.deepEqual(parseCandidates('{"title":"Solo","url":"https://s.example/1"}').map((o) => o.title), ['Solo']);
+});
+
+test('collectCitations finds web sources in any response shape and dedupes', () => {
+  const a = { message: { content: [{ text: 'x', citationsContent: [{ location: { web: { url: 'https://a.example/1', domain: 'a.example' } } }] }] } };
+  const b = { message: { content: [{ text: 'x' }, { citationsContent: { citations: [{ location: { web: { url: 'https://b.example/2' } } }, { location: { web: { url: 'https://b.example/2' } } }] } }] } };
+  assert.deepEqual(collectCitations(a), [{ url: 'https://a.example/1', domain: 'a.example' }]);
+  assert.deepEqual(collectCitations(b), [{ url: 'https://b.example/2', domain: null }]);
+  assert.deepEqual(collectCitations({ message: { content: [{ text: 'none' }] } }), []);
+  assert.deepEqual(collectCitations(undefined), []);
 });
 
 test('baseDomain compares shops by registrable domain', () => {

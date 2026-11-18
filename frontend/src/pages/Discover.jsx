@@ -53,7 +53,7 @@ function IdeaCard({ offer, listId, hasLists, onAdded }) {
       <Badge offer={offer} />
       <h3 className="idea-title">{offer.title}</h3>
       {offer.why && <p className="muted small idea-why">{offer.why}</p>}
-      {offer.verified === false && <p className="muted small idea-why">This shop does not let us preview it — check price and details on its site.</p>}
+      {offer.verified === false && <p className="muted small idea-why">We could not check this link automatically — please verify price and details in the shop.</p>}
       <div className="row between idea-meta">
         <span className="price" title={offer.priceApprox ? 'Price seen in search results — please check it in the shop' : undefined}>{offer.price ? `${offer.priceApprox ? '≈ ' : ''}${money(offer.price, offer.currency || 'UAH')}` : ''}</span>
         <a href={offer.url} target="_blank" rel="noreferrer noopener sponsored" onClick={trackClick} className="small">{host} ↗</a>
